@@ -6,6 +6,7 @@ import { ChatInput } from './components/ChatInput';
 import { MessageBubble } from './components/MessageBubble';
 import { Avatar } from './components/Avatar';
 import { Login } from './components/Login';
+import { translateMessage } from './services/geminiService';
 import { 
   loginAPI, 
   getAllUsersAPI, 
@@ -297,11 +298,34 @@ const App: React.FC = () => {
   const handleSendMessage = async (text: string) => {
     if (!activePersonaId || !activePersona || !currentUser) return;
 
+    // 상대방 정보 가져오기
+    const targetUser = Object.values(allUsers).find(u => u.id === activePersonaId);
+    
+    // 번역 수행 (상대방 국적에 맞게)
+    let translatedText = text;
+    if (targetUser && targetUser.nationality !== currentUser.nationality) {
+      setIsChatLoading(true);
+      try {
+        translatedText = await translateMessage({
+          text: text,
+          targetNationality: targetUser.nationality || 'Korea',
+          targetGender: targetUser.gender || 'male',
+          targetAge: targetUser.age || 25,
+          senderName: currentUser.name
+        });
+      } catch (error) {
+        console.error('번역 실패:', error);
+      }
+      setIsChatLoading(false);
+    }
+
     const newMessage: Message = {
       id: uuidv4(),
       role: Role.USER,
-      text: text,
+      text: text,                    // 원본 (보낸 사람이 볼 내용)
+      translatedText: translatedText, // 번역본 (받는 사람이 볼 내용)
       timestamp: new Date(),
+      senderId: currentUser.id,
     };
 
     setMessages(prev => ({
@@ -452,7 +476,7 @@ const App: React.FC = () => {
                 ) : (
                   <div className="space-y-4 max-w-3xl mx-auto pb-4">
                     {currentMessages.map((msg) => (
-                      <MessageBubble key={msg.id} message={msg} />
+                      <MessageBubble key={msg.id} message={msg} currentUserId={currentUser?.id} />
                     ))}
                     {isChatLoading && (
                       <div className="flex w-full justify-start animate-pulse">

@@ -1,13 +1,24 @@
-import React from 'react';
+import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Message, Role } from '../types';
+import { Globe } from 'lucide-react';
 
 interface MessageBubbleProps {
   message: Message;
+  currentUserId?: string; // 현재 로그인한 사용자 ID
 }
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, currentUserId }) => {
+  const isMyMessage = message.senderId === currentUserId;
   const isUser = message.role === Role.USER;
+  const [showOriginal, setShowOriginal] = useState(false);
+
+  // 내가 보낸 메시지면 원본, 상대방이 보낸 메시지면 번역본 표시
+  const displayText = isMyMessage 
+    ? message.text 
+    : (message.translatedText || message.text);
+  
+  const hasTranslation = message.translatedText && message.translatedText !== message.text;
 
   return (
     <div className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'} mb-4 animate-fadeIn`}>
@@ -37,12 +48,25 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
                 a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="underline decoration-1 underline-offset-2">{children}</a>
               }}
             >
-              {message.text}
+              {showOriginal ? message.text : displayText}
             </ReactMarkdown>
+            
+            {/* 번역 토글 버튼 */}
+            {hasTranslation && (
+              <button
+                onClick={() => setShowOriginal(!showOriginal)}
+                className={`flex items-center gap-1 mt-2 text-[10px] ${
+                  isUser ? 'text-blue-200 hover:text-white' : 'text-gray-400 hover:text-gray-600'
+                } transition-colors`}
+              >
+                <Globe className="w-3 h-3" />
+                {showOriginal ? '번역 보기' : '원문 보기'}
+              </button>
+            )}
           </div>
         )}
         <div className={`text-[10px] mt-1 text-right ${isUser ? 'text-blue-100' : 'text-gray-400'}`}>
-          {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </div>
       </div>
     </div>

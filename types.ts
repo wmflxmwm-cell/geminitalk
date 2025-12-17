@@ -7,10 +7,12 @@ export enum Role {
 export interface Message {
   id: string;
   role: Role;
-  text: string;
+  text: string;           // 원본 메시지
+  translatedText?: string; // 번역된 메시지
   timestamp: Date;
   isError?: boolean;
   senderName?: string;
+  senderId?: string;       // 보낸 사람 ID
 }
 
 export interface Persona {
