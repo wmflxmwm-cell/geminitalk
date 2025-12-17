@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Persona, User as UserType } from '../types';
 import { Avatar } from './Avatar';
-import { Search, User, MessageCircle, Settings, MessageSquarePlus, LogOut, ChevronRight, UserPlus, X, Save, Trash2, Download, Users, KeyRound, AlertCircle } from 'lucide-react';
+import { Search, User, MessageCircle, Settings, LogOut, ChevronRight, UserPlus, X, Save, Trash2, Download, Users, KeyRound, AlertCircle } from 'lucide-react';
 
 interface SidebarProps {
   personas: Persona[];
@@ -12,10 +12,9 @@ interface SidebarProps {
   onLogout: () => void;
   onInstallPWA: () => void;
   canInstallPWA: boolean;
-  onCreateGroupChat: () => void;
   onResetData: () => void;
   isAdmin: boolean;
-  onAddUser: (user: UserType & { password: string }) => boolean;
+  onAddUser: (user: UserType & { password: string }) => Promise<boolean>;
   allUsers: Record<string, UserType & { password: string }>;
   onDeleteUser: (username: string) => void;
   onUpdateUserPassword: (username: string, newPw: string) => void;
@@ -31,7 +30,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onLogout,
   onInstallPWA,
   canInstallPWA,
-  onCreateGroupChat,
   onResetData,
   isAdmin,
   onAddUser,
@@ -164,14 +162,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const renderChatsTab = () => (
     <div className="flex-1 overflow-y-auto no-scrollbar px-3 space-y-1 py-2">
-       {/* Create Group Chat Button */}
-       <button
-        onClick={onCreateGroupChat}
-        className="w-full flex items-center justify-center p-3 mb-2 rounded-xl border border-dashed border-gray-300 text-gray-500 hover:border-primary-500 hover:text-primary-600 hover:bg-primary-50 transition-all"
-      >
-        <MessageSquarePlus className="w-5 h-5 mr-2" />
-        <span className="text-sm font-medium">새 그룹 채팅 만들기</span>
-      </button>
+      {personas.length === 0 ? (
+        <div className="text-center py-10 text-gray-400">
+          <p className="text-sm">아직 대화가 없습니다.</p>
+          <p className="text-xs mt-1">친구 탭에서 대화를 시작하세요!</p>
+        </div>
+      ) : null}
 
       {personas.map((persona) => (
         <button

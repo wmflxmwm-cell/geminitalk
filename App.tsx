@@ -1,13 +1,11 @@
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MoreVertical, Phone, Video, ChevronLeft, CheckSquare, Square, Plus, Trash2, ClipboardList, Calendar } from 'lucide-react';
-import { Chat } from '@google/genai';
 import { Sidebar } from './components/Sidebar';
 import { ChatInput } from './components/ChatInput';
 import { MessageBubble } from './components/MessageBubble';
 import { Avatar } from './components/Avatar';
 import { Login } from './components/Login';
-import { createChatSession, sendMessageToGemini } from './services/geminiService';
 import { 
   loginAPI, 
   getAllUsersAPI, 
@@ -48,36 +46,16 @@ const FALLBACK_USERS: Record<string, User & { password: string }> = {
   },
 };
 
-// Define initial personas
-const INITIAL_PERSONAS: Persona[] = [
-  {
-    id: '1',
-    name: '지민 (일상 친구)',
-    avatar: 'https://picsum.photos/id/64/200/200',
-    description: '편안하게 대화할 수 있는 다정한 친구',
-    systemInstruction: '당신은 사용자의 친한 친구 "지민"입니다. 20대 중반의 여성으로 설정되어 있습니다. 항상 친절하고 공감능력이 뛰어나며, 이모티콘을 적절히 사용하여 따뜻한 말투를 사용합니다. 한국어로 대화합니다.',
-    lastMessage: '오늘 하루는 어땠어? 😊',
-    lastMessageTime: new Date(Date.now() - 1000 * 60 * 60 * 2),
-  },
-  {
-    id: '2',
-    name: 'Tech Guru (코딩 멘토)',
-    avatar: 'https://picsum.photos/id/1/200/200',
-    description: 'React, TypeScript 전문가',
-    systemInstruction: '당신은 시니어 개발자 멘토 "Tech Guru"입니다. 전문적이고 간결하며 정확한 기술적 조언을 제공합니다. 사용자가 코드를 물어보면 최적화된 코드와 설명을 제공합니다. 한국어로 대화합니다.',
-    lastMessage: '코드 리뷰가 필요하면 언제든 말해줘.',
-    lastMessageTime: new Date(Date.now() - 1000 * 60 * 60 * 24),
-  },
-  {
-    id: '3',
-    name: '셰프 킴 (요리사)',
-    avatar: 'https://picsum.photos/id/292/200/200',
-    description: '오늘 뭐 먹지 고민 해결사',
-    systemInstruction: '당신은 열정적인 요리사 "셰프 킴"입니다. 냉장고에 있는 재료로 만들 수 있는 최고의 레시피를 추천해줍니다. 말투는 활기차고 요리에 대한 사랑이 넘칩니다. 한국어로 대화합니다.',
-    lastMessage: '배고프지 않아? 맛있는 거 해먹자!',
-    lastMessageTime: new Date(Date.now() - 1000 * 60 * 60 * 5),
-  },
-];
+// 사용자를 친구 목록 형태로 변환
+const userToFriend = (user: User): Persona => ({
+  id: user.id,
+  name: user.name,
+  avatar: user.avatar,
+  description: user.statusMessage || '',
+  systemInstruction: '',
+  lastMessage: '',
+  lastMessageTime: new Date(),
+});
 
 const App: React.FC = () => {
   // Auth State
@@ -87,8 +65,8 @@ const App: React.FC = () => {
   const [allUsers, setAllUsers] = useState<Record<string, User & { password: string }>>(FALLBACK_USERS);
   const [isServerConnected, setIsServerConnected] = useState(false);
 
-  // Chat State
-  const [personas, setPersonas] = useState<Persona[]>(INITIAL_PERSONAS);
+  // Chat State - 실제 사용자 목록을 친구로 표시
+  const [personas, setPersonas] = useState<Persona[]>([]);
   const [activePersonaId, setActivePersonaId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Record<string, Message[]>>({});
   const [isChatLoading, setIsChatLoading] = useState(false);
@@ -100,7 +78,6 @@ const App: React.FC = () => {
   // PWA Install State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
-  const chatInstances = useRef<Record<string, Chat>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // 서버에서 초기 데이터 로드
@@ -138,9 +115,17 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // 로그인 후 메시지 & 태스크 로드
+  // 로그인 후 메시지 & 태스크 & 친구 목록 로드
   useEffect(() => {
-    if (!currentUser || !isServerConnected) return;
+    if (!currentUser) return;
+
+    // 다른 사용자들을 친구 목록으로 표시
+    const otherUsers = Object.values(allUsers)
+      .filter(u => u.username !== currentUser.username)
+      .map(u => userToFriend(u));
+    setPersonas(otherUsers);
+
+    if (!isServerConnected) return;
 
     const loadUserData = async () => {
       try {
@@ -161,7 +146,7 @@ const App: React.FC = () => {
     };
 
     loadUserData();
-  }, [currentUser, isServerConnected]);
+  }, [currentUser, isServerConnected, allUsers]);
 
   const handleLogin = async (username: string, password: string) => {
     setIsLoginLoading(true);
@@ -285,52 +270,11 @@ const App: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, activePersonaId, isChatLoading]);
 
-  const initializeChat = useCallback((persona: Persona) => {
-    if (!chatInstances.current[persona.id]) {
-      chatInstances.current[persona.id] = createChatSession(persona.systemInstruction);
-    }
-  }, []);
-
   const handleSelectPersona = (id: string) => {
     setActivePersonaId(id);
-    const persona = personas.find(p => p.id === id);
-    if (persona) {
-      initializeChat(persona);
-      if (!messages[id]) {
-        setMessages(prev => ({ ...prev, [id]: [] }));
-      }
+    if (!messages[id]) {
+      setMessages(prev => ({ ...prev, [id]: [] }));
     }
-  };
-
-  const handleCreateGroupChat = () => {
-    const groupPersonaId = uuidv4();
-    const groupName = "어벤져스 팀 (그룹)";
-    const groupMembers = INITIAL_PERSONAS;
-    
-    const combinedSystemInstruction = `
-      당신은 여러 AI 페르소나가 모인 그룹 채팅방의 중재자이자 참여자들입니다.
-      상황에 따라 다음의 캐릭터들이 번갈아가며 대답해야 합니다:
-      ${groupMembers.map(p => `- ${p.name}: ${p.description}`).join('\n')}
-      
-      사용자의 질문이 특정 캐릭터 전문 분야라면 그 캐릭터처럼 행동하여 대답하세요.
-      대답할 때는 반드시 [캐릭터이름] 으로 시작하여 누가 말하는지 알려주세요.
-      예: [지민] 안녕! 무슨 일이야?
-    `;
-
-    const newGroupPersona: Persona = {
-      id: groupPersonaId,
-      name: groupName,
-      avatar: 'https://picsum.photos/id/10/200/200',
-      description: `${groupMembers.length}명의 AI와 함께하는 대화`,
-      systemInstruction: combinedSystemInstruction,
-      lastMessage: '그룹 채팅방이 생성되었습니다.',
-      lastMessageTime: new Date(),
-    };
-
-    setPersonas(prev => [newGroupPersona, ...prev]);
-    setActivePersonaId(groupPersonaId);
-    initializeChat(newGroupPersona);
-    setMessages(prev => ({ ...prev, [groupPersonaId]: [] }));
   };
 
   const handleBackToStart = () => {
@@ -365,61 +309,10 @@ const App: React.FC = () => {
       [activePersonaId]: [...(prev[activePersonaId] || []), newMessage]
     }));
     updatePersonaLastMessage(activePersonaId, text);
-    setIsChatLoading(true);
 
-    // 서버에 사용자 메시지 저장
+    // 서버에 메시지 저장
     if (isServerConnected) {
       saveMessageAPI(currentUser.id, activePersonaId, newMessage).catch(console.error);
-    }
-
-    try {
-      const chat = chatInstances.current[activePersonaId];
-      if (!chat) throw new Error("Chat session not initialized");
-
-      const responseText = await sendMessageToGemini(chat, text);
-
-      let senderName = undefined;
-      let cleanText = responseText;
-      
-      const match = responseText.match(/^\[(.*?)\]\s*(.*)/s);
-      if (match) {
-        senderName = match[1];
-        cleanText = match[2];
-      }
-
-      const aiMessage: Message = {
-        id: uuidv4(),
-        role: Role.MODEL,
-        text: cleanText,
-        timestamp: new Date(),
-        senderName: senderName
-      };
-
-      setMessages(prev => ({
-        ...prev,
-        [activePersonaId]: [...(prev[activePersonaId] || []), aiMessage]
-      }));
-      updatePersonaLastMessage(activePersonaId, cleanText);
-
-      // 서버에 AI 메시지 저장
-      if (isServerConnected) {
-        saveMessageAPI(currentUser.id, activePersonaId, aiMessage).catch(console.error);
-      }
-
-    } catch (error) {
-      const errorMessage: Message = {
-        id: uuidv4(),
-        role: Role.MODEL,
-        text: "죄송합니다. 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
-        timestamp: new Date(),
-        isError: true
-      };
-      setMessages(prev => ({
-        ...prev,
-        [activePersonaId]: [...(prev[activePersonaId] || []), errorMessage]
-      }));
-    } finally {
-      setIsChatLoading(false);
     }
   };
 
@@ -503,7 +396,6 @@ const App: React.FC = () => {
           onLogout={handleLogout}
           onInstallPWA={handleInstallPWA}
           canInstallPWA={!!deferredPrompt}
-          onCreateGroupChat={handleCreateGroupChat}
           onResetData={handleResetData}
           isAdmin={isAdmin}
           onAddUser={handleAddUser}
