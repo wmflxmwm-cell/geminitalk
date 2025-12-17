@@ -68,9 +68,8 @@ const insertUser = db.prepare(`
 
 const existingUsers = db.prepare('SELECT COUNT(*) as count FROM users').get();
 if (existingUsers.count === 0) {
-  insertUser.run('user', 'user1', '1234', '김철수', 'https://picsum.photos/id/1012/200/200', '오늘도 화이팅! 💪', 'male', 25, 'Korea');
   insertUser.run('admin', 'admin1', '1234', '관리자', 'https://picsum.photos/id/1074/200/200', '시스템 관리 중 🛠️', 'male', 30, 'Korea');
-  console.log('✅ 초기 사용자 데이터 생성됨');
+  console.log('✅ 관리자 계정 생성됨 (admin / 1234)');
 }
 
 // 미들웨어
