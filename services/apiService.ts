@@ -1,0 +1,149 @@
+// 백엔드 서버 API 서비스
+
+// 서버 주소 설정 (localStorage에서 가져오거나 기본값 사용)
+const getApiBase = () => {
+  const savedServer = localStorage.getItem('geminiTalkServerAddress');
+  if (!savedServer) return 'http://localhost:3001/api';
+  
+  // ngrok 등 전체 URL인 경우
+  if (savedServer.includes('ngrok') || savedServer.startsWith('http')) {
+    const baseUrl = savedServer.startsWith('http') ? savedServer : `https://${savedServer}`;
+    return `${baseUrl}/api`;
+  }
+  
+  return `http://${savedServer}/api`;
+};
+
+// 서버 주소 저장
+export const setServerAddress = (address: string) => {
+  localStorage.setItem('geminiTalkServerAddress', address);
+};
+
+// 현재 서버 주소 가져오기
+export const getServerAddress = () => {
+  return localStorage.getItem('geminiTalkServerAddress') || 'localhost:3001';
+};
+
+// 서버 연결 테스트
+export const testServerConnection = async (address: string): Promise<boolean> => {
+  try {
+    // ngrok 등 전체 URL인 경우
+    let url: string;
+    if (address.includes('ngrok') || address.startsWith('http')) {
+      const baseUrl = address.startsWith('http') ? address : `https://${address}`;
+      url = `${baseUrl}/api/health`;
+    } else {
+      url = `http://${address}/api/health`;
+    }
+    
+    const res = await fetch(url, {
+      method: 'GET',
+      signal: AbortSignal.timeout(5000) // 5초 타임아웃
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+};
+
+// ============ 인증 API ============
+
+export const loginAPI = async (username: string, password: string) => {
+  const res = await fetch(`${getApiBase()}/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  });
+  
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.message);
+  }
+  
+  return res.json();
+};
+
+// ============ 사용자 API ============
+
+export const getAllUsersAPI = async () => {
+  const res = await fetch(`${getApiBase()}/users`);
+  return res.json();
+};
+
+export const addUserAPI = async (user: any) => {
+  const res = await fetch(`${getApiBase()}/users`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(user),
+  });
+  
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.message);
+  }
+  
+  return res.json();
+};
+
+export const deleteUserAPI = async (username: string) => {
+  const res = await fetch(`${getApiBase()}/users/${username}`, {
+    method: 'DELETE',
+  });
+  return res.json();
+};
+
+export const updatePasswordAPI = async (username: string, newPassword: string) => {
+  const res = await fetch(`${getApiBase()}/users/${username}/password`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ newPassword }),
+  });
+  return res.json();
+};
+
+// ============ 메시지 API ============
+
+export const getUserMessagesAPI = async (userId: string) => {
+  const res = await fetch(`${getApiBase()}/messages/${userId}`);
+  return res.json();
+};
+
+export const getPersonaMessagesAPI = async (userId: string, personaId: string) => {
+  const res = await fetch(`${getApiBase()}/messages/${userId}/${personaId}`);
+  return res.json();
+};
+
+export const saveMessageAPI = async (userId: string, personaId: string, message: any) => {
+  const res = await fetch(`${getApiBase()}/messages/${userId}/${personaId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  });
+  return res.json();
+};
+
+export const saveAllMessagesAPI = async (userId: string, personaId: string, messages: any[]) => {
+  const res = await fetch(`${getApiBase()}/messages/${userId}/${personaId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages }),
+  });
+  return res.json();
+};
+
+// ============ 태스크 API ============
+
+export const getUserTasksAPI = async (userId: string) => {
+  const res = await fetch(`${getApiBase()}/tasks/${userId}`);
+  return res.json();
+};
+
+export const saveUserTasksAPI = async (userId: string, tasks: any) => {
+  const res = await fetch(`${getApiBase()}/tasks/${userId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tasks }),
+  });
+  return res.json();
+};
+

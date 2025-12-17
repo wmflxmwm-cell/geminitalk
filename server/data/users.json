@@ -1,0 +1,24 @@
+{
+  "user": {
+    "id": "user1",
+    "username": "user",
+    "password": "1234",
+    "name": "김철수",
+    "avatar": "https://picsum.photos/id/1012/200/200",
+    "statusMessage": "오늘도 화이팅! 💪",
+    "gender": "male",
+    "age": 25,
+    "nationality": "Korea"
+  },
+  "admin": {
+    "id": "admin1",
+    "username": "admin",
+    "password": "1234",
+    "name": "관리자",
+    "avatar": "https://picsum.photos/id/1074/200/200",
+    "statusMessage": "시스템 관리 중 🛠️",
+    "gender": "male",
+    "age": 30,
+    "nationality": "Korea"
+  }
+}
