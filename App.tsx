@@ -217,6 +217,12 @@ const App: React.FC = () => {
         [newUser.username]: newUser
       };
       setAllUsers(updatedUsers);
+      
+      // 친구 목록에도 즉시 반영 (본인 제외)
+      if (currentUser && newUser.username !== currentUser.username) {
+        setPersonas(prev => [...prev, userToFriend(newUser)]);
+      }
+      
       return true;
     } catch (error) {
       console.error('사용자 추가 실패:', error);
@@ -233,9 +239,15 @@ const App: React.FC = () => {
         await deleteUserAPI(username);
       }
       
+      const deletedUser = allUsers[username];
       const updatedUsers = { ...allUsers };
       delete updatedUsers[username];
       setAllUsers(updatedUsers);
+      
+      // 친구 목록에서도 즉시 제거
+      if (deletedUser) {
+        setPersonas(prev => prev.filter(p => p.id !== deletedUser.id));
+      }
     } catch (error) {
       console.error('사용자 삭제 실패:', error);
     }

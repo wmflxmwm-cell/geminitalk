@@ -57,14 +57,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [addUserError, setAddUserError] = useState('');
   const [newPasswordInput, setNewPasswordInput] = useState('');
 
-  const handleAddUserSubmit = (e: React.FormEvent) => {
+  const handleAddUserSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUser.username || !newUser.password || !newUser.name) {
       setAddUserError('모든 필드를 입력해주세요.');
       return;
     }
     
-    const success = onAddUser({
+    const success = await onAddUser({
       id: newUser.username,
       username: newUser.username,
       password: newUser.password,
