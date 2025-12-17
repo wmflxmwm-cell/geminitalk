@@ -338,6 +338,7 @@ const App: React.FC = () => {
       translatedText: translatedText, // 번역본 (받는 사람이 볼 내용)
       timestamp: new Date(),
       senderId: currentUser.id,
+      senderName: currentUser.name,
     };
 
     setMessages(prev => ({
@@ -346,7 +347,7 @@ const App: React.FC = () => {
     }));
     updatePersonaLastMessage(activePersonaId, text);
 
-    // 서버에 메시지 저장
+    // 서버에 메시지 저장 (서버에서 대화방 ID를 자동 생성)
     if (isServerConnected) {
       saveMessageAPI(currentUser.id, activePersonaId, newMessage).catch(console.error);
     }

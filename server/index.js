@@ -34,18 +34,6 @@ db.exec(`
     nationality TEXT
   );
 
-  CREATE TABLE IF NOT EXISTS messages (
-    id TEXT PRIMARY KEY,
-    userId TEXT NOT NULL,
-    personaId TEXT NOT NULL,
-    role TEXT NOT NULL,
-    text TEXT NOT NULL,
-    timestamp TEXT NOT NULL,
-    senderName TEXT,
-    isError INTEGER DEFAULT 0,
-    createdAt TEXT DEFAULT CURRENT_TIMESTAMP
-  );
-
   CREATE TABLE IF NOT EXISTS tasks (
     id TEXT PRIMARY KEY,
     userId TEXT NOT NULL,
@@ -56,9 +44,60 @@ db.exec(`
     createdAt TEXT DEFAULT CURRENT_TIMESTAMP
   );
 
-  CREATE INDEX IF NOT EXISTS idx_messages_user_persona ON messages(userId, personaId);
   CREATE INDEX IF NOT EXISTS idx_tasks_user_persona ON tasks(userId, personaId);
 `);
+
+// messages 테이블 마이그레이션 (새 스키마로)
+try {
+  // 기존 테이블 확인
+  const tableInfo = db.prepare("PRAGMA table_info(messages)").all();
+  const hasReceiverId = tableInfo.some(col => col.name === 'receiverId');
+  
+  if (!hasReceiverId) {
+    // 기존 테이블이 있으면 삭제하고 새로 생성
+    console.log('📦 메시지 테이블 마이그레이션 중...');
+    db.exec('DROP TABLE IF EXISTS messages');
+    db.exec(`
+      CREATE TABLE messages (
+        id TEXT PRIMARY KEY,
+        chatRoomId TEXT NOT NULL,
+        senderId TEXT NOT NULL,
+        receiverId TEXT NOT NULL,
+        role TEXT NOT NULL,
+        text TEXT NOT NULL,
+        translatedText TEXT,
+        timestamp TEXT NOT NULL,
+        senderName TEXT,
+        isError INTEGER DEFAULT 0,
+        createdAt TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX idx_messages_chatroom ON messages(chatRoomId);
+      CREATE INDEX idx_messages_sender ON messages(senderId);
+      CREATE INDEX idx_messages_receiver ON messages(receiverId);
+    `);
+    console.log('✅ 메시지 테이블 마이그레이션 완료');
+  }
+} catch (e) {
+  // 테이블이 없는 경우 새로 생성
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS messages (
+      id TEXT PRIMARY KEY,
+      chatRoomId TEXT NOT NULL,
+      senderId TEXT NOT NULL,
+      receiverId TEXT NOT NULL,
+      role TEXT NOT NULL,
+      text TEXT NOT NULL,
+      translatedText TEXT,
+      timestamp TEXT NOT NULL,
+      senderName TEXT,
+      isError INTEGER DEFAULT 0,
+      createdAt TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_messages_chatroom ON messages(chatRoomId);
+    CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(senderId);
+    CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiverId);
+  `);
+}
 
 // 초기 사용자 데이터 삽입 (없을 경우)
 const insertUser = db.prepare(`
@@ -145,24 +184,34 @@ app.patch('/api/users/:username/password', (req, res) => {
 
 // ============ 메시지 API ============
 
-// 사용자의 모든 메시지 가져오기
+// 대화방 ID 생성 함수 (두 사용자 ID를 정렬해서 조합)
+const getChatRoomId = (id1, id2) => {
+  return [id1, id2].sort().join('_');
+};
+
+// 사용자의 모든 메시지 가져오기 (해당 사용자가 보내거나 받은 모든 메시지)
 app.get('/api/messages/:userId', (req, res) => {
   const { userId } = req.params;
   const messages = db.prepare(`
-    SELECT * FROM messages WHERE userId = ? ORDER BY timestamp ASC
-  `).all(userId);
+    SELECT * FROM messages WHERE senderId = ? OR receiverId = ? ORDER BY timestamp ASC
+  `).all(userId, userId);
   
-  // personaId별로 그룹화
+  // 대화 상대방별로 그룹화
   const grouped = {};
   messages.forEach(msg => {
-    if (!grouped[msg.personaId]) {
-      grouped[msg.personaId] = [];
+    // 대화 상대방 ID 추출 (내가 보낸 거면 receiverId, 받은 거면 senderId)
+    const personaId = msg.senderId === userId ? msg.receiverId : msg.senderId;
+    
+    if (!grouped[personaId]) {
+      grouped[personaId] = [];
     }
-    grouped[msg.personaId].push({
+    grouped[personaId].push({
       id: msg.id,
       role: msg.role,
       text: msg.text,
+      translatedText: msg.translatedText,
       timestamp: msg.timestamp,
+      senderId: msg.senderId,
       senderName: msg.senderName,
       isError: !!msg.isError
     });
@@ -171,22 +220,51 @@ app.get('/api/messages/:userId', (req, res) => {
   res.json(grouped);
 });
 
+// 특정 대화방 메시지 가져오기
+app.get('/api/messages/room/:chatRoomId', (req, res) => {
+  const { chatRoomId } = req.params;
+  const messages = db.prepare(`
+    SELECT * FROM messages WHERE chatRoomId = ? ORDER BY timestamp ASC
+  `).all(chatRoomId);
+  
+  res.json(messages.map(msg => ({
+    id: msg.id,
+    role: msg.role,
+    text: msg.text,
+    translatedText: msg.translatedText,
+    timestamp: msg.timestamp,
+    senderId: msg.senderId,
+    receiverId: msg.receiverId,
+    senderName: msg.senderName,
+    isError: !!msg.isError
+  })));
+});
+
 // 메시지 저장
 app.post('/api/messages/:userId/:personaId', (req, res) => {
   const { userId, personaId } = req.params;
   const { message } = req.body;
   
+  // 대화방 ID 생성
+  const chatRoomId = getChatRoomId(userId, personaId);
+  
+  // senderId는 실제 보낸 사람, receiverId는 대화 상대방
+  const senderId = message.senderId || userId;
+  const receiverId = senderId === userId ? personaId : userId;
+  
   const stmt = db.prepare(`
-    INSERT INTO messages (id, userId, personaId, role, text, timestamp, senderName, isError)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO messages (id, chatRoomId, senderId, receiverId, role, text, translatedText, timestamp, senderName, isError)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   
   stmt.run(
     message.id,
-    userId,
-    personaId,
+    chatRoomId,
+    senderId,
+    receiverId,
     message.role,
     message.text,
+    message.translatedText || message.text,
     message.timestamp,
     message.senderName || null,
     message.isError ? 1 : 0
@@ -200,21 +278,27 @@ app.put('/api/messages/:userId/:personaId', (req, res) => {
   const { userId, personaId } = req.params;
   const { messages } = req.body;
   
-  const deleteStmt = db.prepare('DELETE FROM messages WHERE userId = ? AND personaId = ?');
+  const chatRoomId = getChatRoomId(userId, personaId);
+  
+  const deleteStmt = db.prepare('DELETE FROM messages WHERE chatRoomId = ?');
   const insertStmt = db.prepare(`
-    INSERT INTO messages (id, userId, personaId, role, text, timestamp, senderName, isError)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO messages (id, chatRoomId, senderId, receiverId, role, text, translatedText, timestamp, senderName, isError)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   
   const transaction = db.transaction(() => {
-    deleteStmt.run(userId, personaId);
+    deleteStmt.run(chatRoomId);
     for (const msg of messages) {
+      const senderId = msg.senderId || userId;
+      const receiverId = senderId === userId ? personaId : userId;
       insertStmt.run(
         msg.id,
-        userId,
-        personaId,
+        chatRoomId,
+        senderId,
+        receiverId,
         msg.role,
         msg.text,
+        msg.translatedText || msg.text,
         msg.timestamp,
         msg.senderName || null,
         msg.isError ? 1 : 0
