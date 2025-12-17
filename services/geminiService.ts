@@ -2,7 +2,9 @@ import { GoogleGenAI, Chat, Content } from "@google/genai";
 import { Message, Role } from "../types";
 
 // Initialize the Gemini API client
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Vite 환경변수 사용 (VITE_ 접두사 필요)
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
+const ai = new GoogleGenAI({ apiKey: API_KEY });
 
 export const createChatSession = (systemInstruction: string) => {
   return ai.chats.create({
