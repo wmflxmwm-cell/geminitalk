@@ -118,25 +118,26 @@ if (existingUsers.count === 0) {
 }
 
 // 미들웨어
-// 모든 요청에 CORS 헤더 추가 (가장 먼저 실행)
+// 모든 OPTIONS 요청 처리 (가장 먼저)
+app.options('*', (req, res) => {
+  console.log('OPTIONS 요청 처리:', req.method, req.path);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, ngrok-skip-browser-warning, Accept, X-Requested-With, Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
+  res.setHeader('Access-Control-Max-Age', '86400');
+  res.status(204).end();
+});
+
+// 모든 요청에 CORS 헤더 추가
 app.use((req, res, next) => {
-  // CORS 헤더 설정
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, ngrok-skip-browser-warning, Accept, X-Requested-With, Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
   res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Type');
-  res.setHeader('Access-Control-Max-Age', '86400'); // 24시간
-  
-  // OPTIONS 요청은 즉시 응답
-  if (req.method === 'OPTIONS') {
-    console.log('OPTIONS 요청 처리:', req.path);
-    return res.status(204).end();
-  }
-  
   next();
 });
 
-// CORS 라이브러리도 사용 (이중 보호)
+// CORS 라이브러리 사용
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -157,6 +158,19 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// 모든 응답에 CORS 헤더 추가 (응답 미들웨어)
+app.use((req, res, next) => {
+  // 응답이 전송되기 전에 CORS 헤더 추가
+  const originalSend = res.send;
+  res.send = function(data) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, ngrok-skip-browser-warning, Accept, X-Requested-With, Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
+    return originalSend.call(this, data);
+  };
+  next();
+});
 
 // 프론트엔드 정적 파일 서빙 (dist 폴더가 있으면)
 const distPath = path.join(__dirname, 'dist');
