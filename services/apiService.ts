@@ -25,7 +25,10 @@ const getApiBase = () => {
 // ngrok 브라우저 경고 페이지 우회를 위한 헤더
 const getHeaders = (includeContentType: boolean = true) => {
   const baseUrl = getApiBase();
-  const isNgrok = baseUrl.includes('ngrok');
+  const savedServer = localStorage.getItem('geminiTalkServerAddress');
+  const envServer = import.meta.env.VITE_SERVER_ADDRESS;
+  const serverAddress = savedServer || envServer || '';
+  const isNgrok = baseUrl.includes('ngrok') || serverAddress.includes('ngrok');
   
   const headers: HeadersInit = {};
   
@@ -33,11 +36,35 @@ const getHeaders = (includeContentType: boolean = true) => {
     headers['Content-Type'] = 'application/json';
   }
   
+  // ngrok 브라우저 경고 페이지 우회
   if (isNgrok) {
     headers['ngrok-skip-browser-warning'] = 'true';
+    // 추가 헤더로 확실하게 우회
+    headers['Accept'] = 'application/json';
   }
   
   return headers;
+};
+
+// 응답이 JSON인지 확인하고 파싱
+const parseJSONResponse = async (res: Response) => {
+  const contentType = res.headers.get('content-type');
+  
+  // HTML이 반환되면 ngrok 경고 페이지일 가능성
+  if (contentType && contentType.includes('text/html')) {
+    const text = await res.text();
+    if (text.includes('<!DOCTYPE') || text.includes('<html')) {
+      throw new Error('서버에 연결할 수 없습니다. ngrok 경고 페이지가 표시되었습니다.');
+    }
+  }
+  
+  // JSON 파싱 시도
+  try {
+    return await res.json();
+  } catch (error) {
+    // JSON이 아니면 에러
+    throw new Error('서버 응답이 올바르지 않습니다.');
+  }
 };
 
 // 서버 주소 저장
@@ -146,11 +173,11 @@ export const loginAPI = async (username: string, password: string) => {
   });
   
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ message: '로그인에 실패했습니다.' }));
+    const error = await parseJSONResponse(res).catch(() => ({ message: '로그인에 실패했습니다.' }));
     throw new Error(error.message || '로그인에 실패했습니다.');
   }
   
-  return res.json();
+  return parseJSONResponse(res);
 };
 
 // ============ 사용자 API ============
@@ -162,7 +189,7 @@ export const getAllUsersAPI = async () => {
   if (!res.ok) {
     throw new Error('사용자 목록을 불러올 수 없습니다.');
   }
-  return res.json();
+  return parseJSONResponse(res);
 };
 
 export const addUserAPI = async (user: any) => {
@@ -173,11 +200,11 @@ export const addUserAPI = async (user: any) => {
   });
   
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ message: '사용자 추가에 실패했습니다.' }));
+    const error = await parseJSONResponse(res).catch(() => ({ message: '사용자 추가에 실패했습니다.' }));
     throw new Error(error.message || '사용자 추가에 실패했습니다.');
   }
   
-  return res.json();
+  return parseJSONResponse(res);
 };
 
 export const deleteUserAPI = async (username: string) => {
@@ -188,7 +215,7 @@ export const deleteUserAPI = async (username: string) => {
   if (!res.ok) {
     throw new Error('사용자 삭제에 실패했습니다.');
   }
-  return res.json();
+  return parseJSONResponse(res);
 };
 
 export const updatePasswordAPI = async (username: string, newPassword: string) => {
@@ -200,7 +227,7 @@ export const updatePasswordAPI = async (username: string, newPassword: string) =
   if (!res.ok) {
     throw new Error('비밀번호 변경에 실패했습니다.');
   }
-  return res.json();
+  return parseJSONResponse(res);
 };
 
 // ============ 메시지 API ============
@@ -212,7 +239,7 @@ export const getUserMessagesAPI = async (userId: string) => {
   if (!res.ok) {
     throw new Error('메시지를 불러올 수 없습니다.');
   }
-  return res.json();
+  return parseJSONResponse(res);
 };
 
 export const getPersonaMessagesAPI = async (userId: string, personaId: string) => {
@@ -222,7 +249,7 @@ export const getPersonaMessagesAPI = async (userId: string, personaId: string) =
   if (!res.ok) {
     throw new Error('메시지를 불러올 수 없습니다.');
   }
-  return res.json();
+  return parseJSONResponse(res);
 };
 
 export const saveMessageAPI = async (userId: string, personaId: string, message: any) => {
@@ -234,7 +261,7 @@ export const saveMessageAPI = async (userId: string, personaId: string, message:
   if (!res.ok) {
     throw new Error('메시지 저장에 실패했습니다.');
   }
-  return res.json();
+  return parseJSONResponse(res);
 };
 
 export const saveAllMessagesAPI = async (userId: string, personaId: string, messages: any[]) => {
@@ -246,7 +273,7 @@ export const saveAllMessagesAPI = async (userId: string, personaId: string, mess
   if (!res.ok) {
     throw new Error('메시지 저장에 실패했습니다.');
   }
-  return res.json();
+  return parseJSONResponse(res);
 };
 
 // ============ 태스크 API ============
@@ -258,7 +285,7 @@ export const getUserTasksAPI = async (userId: string) => {
   if (!res.ok) {
     throw new Error('태스크를 불러올 수 없습니다.');
   }
-  return res.json();
+  return parseJSONResponse(res);
 };
 
 export const saveUserTasksAPI = async (userId: string, tasks: any) => {
@@ -270,6 +297,6 @@ export const saveUserTasksAPI = async (userId: string, tasks: any) => {
   if (!res.ok) {
     throw new Error('태스크 저장에 실패했습니다.');
   }
-  return res.json();
+  return parseJSONResponse(res);
 };
 
