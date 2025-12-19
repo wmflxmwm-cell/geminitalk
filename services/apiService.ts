@@ -24,24 +24,17 @@ const getApiBase = () => {
 
 // ngrok 브라우저 경고 페이지 우회를 위한 헤더
 const getHeaders = (includeContentType: boolean = true) => {
-  const baseUrl = getApiBase();
-  const savedServer = localStorage.getItem('geminiTalkServerAddress');
-  const envServer = import.meta.env.VITE_SERVER_ADDRESS;
-  const serverAddress = savedServer || envServer || '';
-  const isNgrok = baseUrl.includes('ngrok') || serverAddress.includes('ngrok');
-  
   const headers: HeadersInit = {};
   
   if (includeContentType) {
     headers['Content-Type'] = 'application/json';
   }
   
-  // ngrok 브라우저 경고 페이지 우회
-  if (isNgrok) {
-    headers['ngrok-skip-browser-warning'] = 'true';
-    // 추가 헤더로 확실하게 우회
-    headers['Accept'] = 'application/json';
-  }
+  // Accept 헤더는 항상 추가 (ngrok 호환성)
+  headers['Accept'] = 'application/json';
+  
+  // ngrok-skip-browser-warning 헤더는 CORS preflight에서 문제를 일으킬 수 있으므로 제거
+  // 대신 서버에서 ngrok 경고 페이지를 처리하도록 함
   
   return headers;
 };
@@ -89,14 +82,9 @@ export const testServerConnection = async (address: string): Promise<boolean> =>
       url = `http://${address}/api/health`;
     }
     
-    const isNgrok = address.includes('ngrok');
-    const headers: HeadersInit = isNgrok 
-      ? { 'ngrok-skip-browser-warning': 'true' }
-      : {};
-    
     const res = await fetch(url, {
       method: 'GET',
-      headers,
+      headers: { 'Accept': 'application/json' },
       signal: AbortSignal.timeout(5000) // 5초 타임아웃
     });
     return res.ok;
@@ -139,7 +127,7 @@ export const autoDetectServerAddress = async (): Promise<string | null> => {
       const url = `http://${candidate}/api/server-info`;
       const res = await fetch(url, {
         method: 'GET',
-        headers: { 'ngrok-skip-browser-warning': 'true' },
+        headers: { 'Accept': 'application/json' },
         signal: AbortSignal.timeout(2000) // 2초 타임아웃
       });
       
