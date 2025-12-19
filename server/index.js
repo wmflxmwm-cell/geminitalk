@@ -119,27 +119,35 @@ if (existingUsers.count === 0) {
 
 // 미들웨어
 // 모든 OPTIONS 요청 처리 (가장 먼저) - 모든 경로에 대해
+// cors 라이브러리보다 먼저 실행되어야 함
 app.options('*', (req, res) => {
-  console.log('🔵 OPTIONS 요청 처리:', req.method, req.path, req.headers.origin);
-  console.log('🔵 요청된 헤더:', req.headers['access-control-request-headers']);
+  const origin = req.headers.origin || '*';
+  const requestedHeaders = req.headers['access-control-request-headers'] || '';
+  const requestedMethod = req.headers['access-control-request-method'] || 'GET, POST, PUT, PATCH, DELETE, OPTIONS';
   
-  // 요청된 헤더를 그대로 허용 (ngrok 호환성)
-  const requestedHeaders = req.headers['access-control-request-headers'];
+  console.log('🔵 OPTIONS 요청 처리:', req.method, req.path);
+  console.log('🔵 Origin:', origin);
+  console.log('🔵 요청된 헤더:', requestedHeaders);
+  console.log('🔵 요청된 메서드:', requestedMethod);
   
-  // ngrok-skip-browser-warning을 포함한 모든 헤더 허용
+  // 요청된 헤더를 그대로 허용 + 기본 헤더 추가
   const defaultHeaders = 'Content-Type, Authorization, ngrok-skip-browser-warning, Accept, X-Requested-With, Origin, Access-Control-Request-Method, Access-Control-Request-Headers';
-  const allowHeaders = requestedHeaders 
-    ? `${requestedHeaders}, ${defaultHeaders}`.split(', ').filter((v, i, a) => a.indexOf(v) === i).join(', ')
+  const allHeaders = requestedHeaders 
+    ? `${requestedHeaders}, ${defaultHeaders}`.split(',').map(h => h.trim()).filter((v, i, a) => a.indexOf(v) === i).join(', ')
     : defaultHeaders;
   
+  // CORS 헤더 설정
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', allowHeaders);
+  res.setHeader('Access-Control-Allow-Methods', requestedMethod || 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', allHeaders);
   res.setHeader('Access-Control-Max-Age', '86400');
   res.setHeader('Access-Control-Allow-Credentials', 'false');
   res.setHeader('Vary', 'Origin, Access-Control-Request-Headers');
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Type');
   
-  console.log('🔵 허용할 헤더:', allowHeaders);
+  console.log('🔵 응답 헤더 설정 완료');
+  console.log('🔵 허용할 헤더:', allHeaders);
+  
   res.status(204).end();
 });
 
@@ -158,25 +166,9 @@ app.use((req, res, next) => {
   next();
 });
 
-// CORS 라이브러리 사용
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: [
-    'Content-Type',
-    'Authorization',
-    'ngrok-skip-browser-warning',
-    'Accept',
-    'X-Requested-With',
-    'Origin',
-    'Access-Control-Request-Method',
-    'Access-Control-Request-Headers'
-  ],
-  exposedHeaders: ['Content-Length', 'Content-Type'],
-  credentials: false,
-  preflightContinue: false,
-  optionsSuccessStatus: 204
-}));
+// CORS 라이브러리는 비활성화 (수동 OPTIONS 핸들러와 충돌 방지)
+// cors 라이브러리는 OPTIONS 요청을 자동으로 처리하지만, 우리는 수동으로 더 세밀하게 제어
+// app.use(cors({ ... })); // 주석 처리 - 수동 CORS 처리 사용
 
 app.use(express.json());
 
