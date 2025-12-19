@@ -131,9 +131,28 @@ app.get('/api/health', (req, res) => {
 });
 
 // 서버 정보 API (자동 주소 감지용)
-app.get('/api/server-info', (req, res) => {
+app.get('/api/server-info', async (req, res) => {
   // 환경 변수에서 서버 주소 가져오기 (우선순위 1)
   const envServerAddress = process.env.SERVER_ADDRESS;
+  
+  // ngrok 로컬 API에서 터널 정보 가져오기 시도 (우선순위 2)
+  let ngrokAddress = null;
+  try {
+    const ngrokResponse = await fetch('http://127.0.0.1:4040/api/tunnels');
+    if (ngrokResponse.ok) {
+      const ngrokData = await ngrokResponse.json();
+      // 공개 URL 찾기
+      const publicTunnel = ngrokData.tunnels?.find(t => t.proto === 'https' || t.proto === 'http');
+      if (publicTunnel && publicTunnel.public_url) {
+        // https://example.ngrok-free.dev -> example.ngrok-free.dev
+        const url = new URL(publicTunnel.public_url);
+        ngrokAddress = url.host;
+      }
+    }
+  } catch (e) {
+    // ngrok이 실행되지 않았거나 접근 불가
+    console.log('ngrok 로컬 API 접근 실패 (정상일 수 있음)');
+  }
   
   // 요청 헤더에서 호스트 정보 가져오기
   const host = req.get('host');
@@ -146,6 +165,9 @@ app.get('/api/server-info', (req, res) => {
   if (envServerAddress) {
     // 환경 변수가 설정되어 있으면 사용
     serverAddress = envServerAddress;
+  } else if (ngrokAddress) {
+    // ngrok에서 자동 감지된 주소 사용
+    serverAddress = ngrokAddress;
   } else if (referer) {
     // Referer에서 도메인 추출
     try {
