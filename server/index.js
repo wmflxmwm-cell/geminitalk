@@ -120,8 +120,17 @@ if (existingUsers.count === 0) {
 // 미들웨어
 app.use(cors({
   origin: '*', // 모든 도메인에서 접근 허용 (개발용)
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-  allowedHeaders: ['Content-Type']
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'ngrok-skip-browser-warning',
+    'Accept',
+    'X-Requested-With'
+  ],
+  credentials: false,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
 app.use(express.json());
 
