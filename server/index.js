@@ -118,6 +118,7 @@ if (existingUsers.count === 0) {
 }
 
 // 미들웨어
+// CORS 설정
 app.use(cors({
   origin: '*', // 모든 도메인에서 접근 허용 (개발용)
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -126,12 +127,25 @@ app.use(cors({
     'Authorization',
     'ngrok-skip-browser-warning',
     'Accept',
-    'X-Requested-With'
+    'X-Requested-With',
+    'Origin',
+    'Access-Control-Request-Method',
+    'Access-Control-Request-Headers'
   ],
+  exposedHeaders: ['Content-Length', 'Content-Type'],
   credentials: false,
   preflightContinue: false,
   optionsSuccessStatus: 204
 }));
+
+// OPTIONS 요청 명시적 처리
+app.options('*', (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, ngrok-skip-browser-warning, Accept, X-Requested-With, Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
+  res.sendStatus(204);
+});
+
 app.use(express.json());
 
 // 프론트엔드 정적 파일 서빙 (dist 폴더가 있으면)
