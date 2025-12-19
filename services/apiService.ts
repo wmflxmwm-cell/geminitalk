@@ -46,6 +46,63 @@ export const testServerConnection = async (address: string): Promise<boolean> =>
   }
 };
 
+// 서버 주소 자동 감지
+export const autoDetectServerAddress = async (): Promise<string | null> => {
+  // 이미 저장된 주소가 있으면 사용
+  const savedAddress = localStorage.getItem('geminiTalkServerAddress');
+  if (savedAddress && savedAddress !== 'localhost:3001') {
+    // 저장된 주소가 유효한지 확인
+    const isValid = await testServerConnection(savedAddress);
+    if (isValid) {
+      return savedAddress;
+    }
+  }
+
+  // 환경 변수에서 서버 주소 가져오기 (Vite 환경 변수)
+  const envServerAddress = import.meta.env.VITE_SERVER_ADDRESS;
+  if (envServerAddress) {
+    const isValid = await testServerConnection(envServerAddress);
+    if (isValid) {
+      setServerAddress(envServerAddress);
+      return envServerAddress;
+    }
+  }
+
+  // 자동 감지: 여러 가능한 주소 시도
+  const candidates = [
+    'localhost:3001',
+    // 일반적인 로컬 네트워크 IP 범위는 시도하지 않음 (너무 많음)
+  ];
+
+  // 각 후보 주소를 시도
+  for (const candidate of candidates) {
+    try {
+      const url = `http://${candidate}/api/server-info`;
+      const res = await fetch(url, {
+        method: 'GET',
+        signal: AbortSignal.timeout(2000) // 2초 타임아웃
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        if (data.serverAddress) {
+          // 서버가 반환한 주소 사용
+          setServerAddress(data.serverAddress);
+          return data.serverAddress;
+        }
+        // 서버가 주소를 반환하지 않으면 후보 주소 사용
+        setServerAddress(candidate);
+        return candidate;
+      }
+    } catch {
+      // 다음 후보 시도
+      continue;
+    }
+  }
+
+  return null;
+};
+
 // ============ 인증 API ============
 
 export const loginAPI = async (username: string, password: string) => {

@@ -130,6 +130,44 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// 서버 정보 API (자동 주소 감지용)
+app.get('/api/server-info', (req, res) => {
+  // 환경 변수에서 서버 주소 가져오기 (우선순위 1)
+  const envServerAddress = process.env.SERVER_ADDRESS;
+  
+  // 요청 헤더에서 호스트 정보 가져오기
+  const host = req.get('host');
+  const protocol = req.protocol || (req.get('x-forwarded-proto') || 'http');
+  
+  // Referer에서 주소 추출 시도
+  const referer = req.get('referer');
+  let serverAddress = null;
+  
+  if (envServerAddress) {
+    // 환경 변수가 설정되어 있으면 사용
+    serverAddress = envServerAddress;
+  } else if (referer) {
+    // Referer에서 도메인 추출
+    try {
+      const url = new URL(referer);
+      serverAddress = url.host;
+    } catch (e) {
+      // Referer 파싱 실패 시 host 사용
+      serverAddress = host;
+    }
+  } else if (host) {
+    // host 헤더 사용
+    serverAddress = host;
+  }
+  
+  res.json({ 
+    serverAddress: serverAddress,
+    protocol: protocol,
+    host: host,
+    timestamp: new Date().toISOString()
+  });
+});
+
 // ============ 사용자 API ============
 
 // 로그인

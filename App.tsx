@@ -17,7 +17,8 @@ import {
   saveMessageAPI,
   getUserTasksAPI,
   saveUserTasksAPI,
-  getServerAddress
+  getServerAddress,
+  autoDetectServerAddress
 } from './services/apiService';
 import { Message, Persona, Role, User, Task } from './types';
 import { v4 as uuidv4 } from 'uuid';
@@ -86,6 +87,12 @@ const App: React.FC = () => {
   useEffect(() => {
     const loadInitialData = async () => {
       try {
+        // 서버 주소 자동 감지 시도
+        const detectedAddress = await autoDetectServerAddress();
+        if (detectedAddress) {
+          console.log('✅ 서버 주소 자동 감지:', detectedAddress);
+        }
+        
         // 서버에서 사용자 목록 가져오기
         const users = await getAllUsersAPI();
         setAllUsers(users);
