@@ -120,14 +120,17 @@ if (existingUsers.count === 0) {
 // 미들웨어
 // 모든 요청에 CORS 헤더 추가 (가장 먼저 실행)
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, ngrok-skip-browser-warning, Accept, X-Requested-With, Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
-  res.header('Access-Control-Expose-Headers', 'Content-Length, Content-Type');
+  // CORS 헤더 설정
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, ngrok-skip-browser-warning, Accept, X-Requested-With, Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Type');
+  res.setHeader('Access-Control-Max-Age', '86400'); // 24시간
   
   // OPTIONS 요청은 즉시 응답
   if (req.method === 'OPTIONS') {
-    return res.sendStatus(204);
+    console.log('OPTIONS 요청 처리:', req.path);
+    return res.status(204).end();
   }
   
   next();
@@ -163,6 +166,7 @@ if (fs.existsSync(distPath)) {
 
 // 상태 확인 API
 app.get('/api/health', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
@@ -230,6 +234,7 @@ app.get('/api/server-info', async (req, res) => {
 
 // 로그인
 app.post('/api/login', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
   const { username, password } = req.body;
   const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
   
@@ -243,6 +248,7 @@ app.post('/api/login', (req, res) => {
 
 // 모든 사용자 목록
 app.get('/api/users', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
   const users = db.prepare('SELECT * FROM users').all();
   const usersMap = {};
   users.forEach(user => {
