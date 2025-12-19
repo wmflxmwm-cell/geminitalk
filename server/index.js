@@ -121,12 +121,16 @@ if (existingUsers.count === 0) {
 // 모든 OPTIONS 요청 처리 (가장 먼저) - 모든 경로에 대해
 app.options('*', (req, res) => {
   console.log('🔵 OPTIONS 요청 처리:', req.method, req.path, req.headers.origin);
+  console.log('🔵 요청된 헤더:', req.headers['access-control-request-headers']);
   
   // 요청된 헤더를 그대로 허용 (ngrok 호환성)
   const requestedHeaders = req.headers['access-control-request-headers'];
+  
+  // ngrok-skip-browser-warning을 포함한 모든 헤더 허용
+  const defaultHeaders = 'Content-Type, Authorization, ngrok-skip-browser-warning, Accept, X-Requested-With, Origin, Access-Control-Request-Method, Access-Control-Request-Headers';
   const allowHeaders = requestedHeaders 
-    ? requestedHeaders 
-    : 'Content-Type, Authorization, ngrok-skip-browser-warning, Accept, X-Requested-With, Origin, Access-Control-Request-Method, Access-Control-Request-Headers';
+    ? `${requestedHeaders}, ${defaultHeaders}`.split(', ').filter((v, i, a) => a.indexOf(v) === i).join(', ')
+    : defaultHeaders;
   
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
