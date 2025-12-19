@@ -118,22 +118,29 @@ if (existingUsers.count === 0) {
 }
 
 // 미들웨어
-// 모든 OPTIONS 요청 처리 (가장 먼저)
+// 모든 OPTIONS 요청 처리 (가장 먼저) - 모든 경로에 대해
 app.options('*', (req, res) => {
-  console.log('OPTIONS 요청 처리:', req.method, req.path);
+  console.log('🔵 OPTIONS 요청 처리:', req.method, req.path, req.headers.origin);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, ngrok-skip-browser-warning, Accept, X-Requested-With, Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
   res.setHeader('Access-Control-Max-Age', '86400');
+  res.setHeader('Access-Control-Allow-Credentials', 'false');
   res.status(204).end();
 });
 
-// 모든 요청에 CORS 헤더 추가
+// 모든 요청에 CORS 헤더 추가 (요청 로깅 포함)
 app.use((req, res, next) => {
+  // 요청 로깅 (디버깅용)
+  if (req.method !== 'OPTIONS') {
+    console.log(`📥 ${req.method} ${req.path} from ${req.headers.origin || 'unknown'}`);
+  }
+  
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, ngrok-skip-browser-warning, Accept, X-Requested-With, Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
   res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Type');
+  res.setHeader('Access-Control-Allow-Credentials', 'false');
   next();
 });
 
@@ -249,14 +256,30 @@ app.get('/api/server-info', async (req, res) => {
 // 로그인
 app.post('/api/login', (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  const { username, password } = req.body;
-  const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, ngrok-skip-browser-warning, Accept, X-Requested-With, Origin');
   
-  if (user && user.password === password) {
-    const { password: _, ...safeUser } = user;
-    res.json({ success: true, user: safeUser });
-  } else {
-    res.status(401).json({ success: false, message: '아이디 또는 비밀번호가 올바르지 않습니다.' });
+  try {
+    const { username, password } = req.body;
+    
+    if (!username || !password) {
+      return res.status(400).json({ success: false, message: '아이디와 비밀번호를 입력해주세요.' });
+    }
+    
+    console.log(`로그인 시도: ${username}`);
+    const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+    
+    if (user && user.password === password) {
+      const { password: _, ...safeUser } = user;
+      console.log(`✅ 로그인 성공: ${username}`);
+      res.json({ success: true, user: safeUser });
+    } else {
+      console.log(`❌ 로그인 실패: ${username} (사용자 없음 또는 비밀번호 불일치)`);
+      res.status(401).json({ success: false, message: '아이디 또는 비밀번호가 올바르지 않습니다.' });
+    }
+  } catch (error) {
+    console.error('로그인 에러:', error);
+    res.status(500).json({ success: false, message: '로그인 중 오류가 발생했습니다.' });
   }
 });
 
