@@ -105,6 +105,12 @@ const insertUser = db.prepare(`
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 
+// 사용자 추가용 (에러 발생)
+const insertUserWithError = db.prepare(`
+  INSERT INTO users (username, id, password, name, avatar, statusMessage, gender, age, nationality)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+`);
+
 const existingUsers = db.prepare('SELECT COUNT(*) as count FROM users').get();
 if (existingUsers.count === 0) {
   insertUser.run('admin', 'admin1', '1234', '관리자', 'https://picsum.photos/id/1074/200/200', '시스템 관리 중 🛠️', 'male', 30, 'Korea');
@@ -219,11 +225,32 @@ app.get('/api/users', (req, res) => {
 app.post('/api/users', (req, res) => {
   const { username, id, password, name, avatar, statusMessage, gender, age, nationality } = req.body;
   
+  // 필수 필드 확인
+  if (!username || !id || !password || !name) {
+    return res.status(400).json({ success: false, message: '필수 필드가 누락되었습니다.' });
+  }
+  
   try {
-    insertUser.run(username, id, password, name, avatar, statusMessage, gender, age, nationality);
-    res.json({ success: true });
+    // 사용자 추가 시도
+    insertUserWithError.run(username, id, password, name, avatar || null, statusMessage || null, gender || null, age || null, nationality || null);
+    
+    // 추가 성공 확인
+    const addedUser = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+    if (addedUser) {
+      console.log(`✅ 사용자 추가 성공: ${username}`);
+      res.json({ success: true });
+    } else {
+      res.status(500).json({ success: false, message: '사용자 추가에 실패했습니다.' });
+    }
   } catch (error) {
-    res.status(400).json({ success: false, message: '이미 존재하는 아이디입니다.' });
+    // SQLite 에러 코드 19는 UNIQUE constraint violation
+    if (error.code === 'SQLITE_CONSTRAINT_UNIQUE' || error.message.includes('UNIQUE constraint')) {
+      console.error(`❌ 사용자 추가 실패 (중복): ${username}`, error);
+      res.status(400).json({ success: false, message: '이미 존재하는 아이디입니다.' });
+    } else {
+      console.error(`❌ 사용자 추가 실패: ${username}`, error);
+      res.status(500).json({ success: false, message: '사용자 추가 중 오류가 발생했습니다.' });
+    }
   }
 });
 

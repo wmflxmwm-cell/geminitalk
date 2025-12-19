@@ -245,12 +245,24 @@ const App: React.FC = () => {
 
     try {
       if (isServerConnected) {
+        // 서버에 사용자 추가
         await addUserAPI(newUser);
+        
         // 서버에서 최신 사용자 목록 다시 불러오기 (서버의 최신 상태 유지)
         const users = await getAllUsersAPI();
         if (users) {
           setAllUsers(users);
+          
+          // 추가된 사용자가 실제로 서버에 저장되었는지 확인
+          if (!users[newUser.username]) {
+            console.error('❌ 사용자 추가 후 서버에서 찾을 수 없음:', newUser.username);
+            throw new Error('사용자가 서버에 저장되지 않았습니다.');
+          }
+          
+          console.log('✅ 사용자 추가 성공 및 확인:', newUser.username);
           // useEffect가 allUsers 변경을 감지하여 친구 목록 자동 업데이트
+        } else {
+          throw new Error('사용자 목록을 불러올 수 없습니다.');
         }
       } else {
         // 로컬 모드 (서버 연결 안 됨)
@@ -263,9 +275,9 @@ const App: React.FC = () => {
       }
       
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('사용자 추가 실패:', error);
-      return false;
+      throw error; // 에러를 다시 throw하여 Sidebar에서 처리할 수 있도록
     }
   };
 

@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import { Persona, User as UserType } from '../types';
 import { Avatar } from './Avatar';
 import { Search, User, MessageCircle, Settings, LogOut, ChevronRight, UserPlus, X, Save, Trash2, Download, Users, KeyRound, AlertCircle } from 'lucide-react';
@@ -59,38 +60,45 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const handleAddUserSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAddUserError('');
+    
     if (!newUser.username || !newUser.password || !newUser.name) {
       setAddUserError('모든 필드를 입력해주세요.');
       return;
     }
     
-    const success = await onAddUser({
-      id: newUser.username,
-      username: newUser.username,
-      password: newUser.password,
-      name: newUser.name,
-      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(newUser.name)}&background=random`,
-      statusMessage: '안녕하세요! 신규 사용자입니다.',
-      gender: newUser.gender,
-      age: newUser.age,
-      nationality: newUser.nationality
-    });
-
-    if (success) {
-      setShowAddUserModal(false);
-      setNewUser({ 
-        id: '', 
-        password: '', 
-        name: '', 
-        username: '',
-        gender: 'male',
-        age: 20,
-        nationality: 'Korea'
+    try {
+      const success = await onAddUser({
+        id: uuidv4(), // 고유 ID 생성
+        username: newUser.username,
+        password: newUser.password,
+        name: newUser.name,
+        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(newUser.name)}&background=random`,
+        statusMessage: '안녕하세요! 신규 사용자입니다.',
+        gender: newUser.gender,
+        age: newUser.age,
+        nationality: newUser.nationality
       });
-      setAddUserError('');
-      alert('사용자가 성공적으로 생성되었습니다.');
-    } else {
-      setAddUserError('이미 존재하는 아이디입니다.');
+
+      if (success) {
+        setShowAddUserModal(false);
+        setNewUser({ 
+          id: '', 
+          password: '', 
+          name: '', 
+          username: '',
+          gender: 'male',
+          age: 20,
+          nationality: 'Korea'
+        });
+        setAddUserError('');
+        alert('사용자가 성공적으로 생성되었습니다.');
+      } else {
+        setAddUserError('사용자 생성에 실패했습니다.');
+      }
+    } catch (error: any) {
+      console.error('사용자 추가 에러:', error);
+      setAddUserError(error.message || '사용자 생성 중 오류가 발생했습니다.');
     }
   };
 
