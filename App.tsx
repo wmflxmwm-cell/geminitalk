@@ -65,7 +65,7 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoginLoading, setIsLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | undefined>();
-  const [allUsers, setAllUsers] = useState<Record<string, User & { password: string }>>(FALLBACK_USERS);
+  const [allUsers, setAllUsers] = useState<Record<string, User & { password: string }>>({});
   const [isServerConnected, setIsServerConnected] = useState(false);
 
   // Chat State - 실제 사용자 목록을 친구로 표시
@@ -95,22 +95,20 @@ const App: React.FC = () => {
         
         // 서버에서 사용자 목록 가져오기
         const users = await getAllUsersAPI();
-        setAllUsers(users);
+        if (users && Object.keys(users).length > 0) {
+          setAllUsers(users);
+        }
         setIsServerConnected(true);
         console.log('✅ 백엔드 서버 연결됨');
       } catch (error) {
         console.warn('⚠️ 백엔드 서버 연결 실패, 로컬 모드로 동작합니다.');
         setIsServerConnected(false);
+        // 서버 연결 실패 시에도 빈 객체 유지 (FALLBACK_USERS 사용 안 함)
+        // 서버에 저장된 사용자 데이터를 보존하기 위함
       }
     };
 
     loadInitialData();
-
-    // 세션 복구 (localStorage)
-    const savedUser = localStorage.getItem('geminiTalkUser');
-    if (savedUser) {
-      setCurrentUser(JSON.parse(savedUser));
-    }
 
     // PWA Install Event Listener
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -242,17 +240,20 @@ const App: React.FC = () => {
     try {
       if (isServerConnected) {
         await addUserAPI(newUser);
-      }
-      
-      const updatedUsers = {
-        ...allUsers,
-        [newUser.username]: newUser
-      };
-      setAllUsers(updatedUsers);
-      
-      // 친구 목록에도 즉시 반영 (본인 제외)
-      if (currentUser && newUser.username !== currentUser.username) {
-        setPersonas(prev => [...prev, userToFriend(newUser)]);
+        // 서버에서 최신 사용자 목록 다시 불러오기 (서버의 최신 상태 유지)
+        const users = await getAllUsersAPI();
+        if (users && Object.keys(users).length > 0) {
+          setAllUsers(users);
+          // useEffect가 allUsers 변경을 감지하여 친구 목록 자동 업데이트
+        }
+      } else {
+        // 로컬 모드 (서버 연결 안 됨)
+        const updatedUsers = {
+          ...allUsers,
+          [newUser.username]: newUser
+        };
+        setAllUsers(updatedUsers);
+        // useEffect가 allUsers 변경을 감지하여 친구 목록 자동 업데이트
       }
       
       return true;
@@ -269,16 +270,18 @@ const App: React.FC = () => {
     try {
       if (isServerConnected) {
         await deleteUserAPI(username);
-      }
-      
-      const deletedUser = allUsers[username];
-      const updatedUsers = { ...allUsers };
-      delete updatedUsers[username];
-      setAllUsers(updatedUsers);
-      
-      // 친구 목록에서도 즉시 제거
-      if (deletedUser) {
-        setPersonas(prev => prev.filter(p => p.id !== deletedUser.id));
+        // 서버에서 최신 사용자 목록 다시 불러오기 (서버의 최신 상태 유지)
+        const users = await getAllUsersAPI();
+        if (users && Object.keys(users).length > 0) {
+          setAllUsers(users);
+          // useEffect가 allUsers 변경을 감지하여 친구 목록 자동 업데이트
+        }
+      } else {
+        // 로컬 모드 (서버 연결 안 됨)
+        const updatedUsers = { ...allUsers };
+        delete updatedUsers[username];
+        setAllUsers(updatedUsers);
+        // useEffect가 allUsers 변경을 감지하여 친구 목록 자동 업데이트
       }
     } catch (error) {
       console.error('사용자 삭제 실패:', error);
