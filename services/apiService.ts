@@ -3,7 +3,15 @@
 // 서버 주소 설정 (localStorage에서 가져오거나 기본값 사용)
 const getApiBase = () => {
   const savedServer = localStorage.getItem('geminiTalkServerAddress');
-  if (!savedServer) return 'http://localhost:3001/api';
+  if (!savedServer) {
+    // 환경 변수 확인
+    const envServer = import.meta.env.VITE_SERVER_ADDRESS;
+    if (envServer) {
+      const baseUrl = envServer.startsWith('http') ? envServer : `https://${envServer}`;
+      return `${baseUrl}/api`;
+    }
+    return 'http://localhost:3001/api';
+  }
   
   // ngrok 등 전체 URL인 경우
   if (savedServer.includes('ngrok') || savedServer.startsWith('http')) {
@@ -12,6 +20,24 @@ const getApiBase = () => {
   }
   
   return `http://${savedServer}/api`;
+};
+
+// ngrok 브라우저 경고 페이지 우회를 위한 헤더
+const getHeaders = (includeContentType: boolean = true) => {
+  const baseUrl = getApiBase();
+  const isNgrok = baseUrl.includes('ngrok');
+  
+  const headers: HeadersInit = {};
+  
+  if (includeContentType) {
+    headers['Content-Type'] = 'application/json';
+  }
+  
+  if (isNgrok) {
+    headers['ngrok-skip-browser-warning'] = 'true';
+  }
+  
+  return headers;
 };
 
 // 서버 주소 저장
@@ -36,8 +62,14 @@ export const testServerConnection = async (address: string): Promise<boolean> =>
       url = `http://${address}/api/health`;
     }
     
+    const isNgrok = address.includes('ngrok');
+    const headers: HeadersInit = isNgrok 
+      ? { 'ngrok-skip-browser-warning': 'true' }
+      : {};
+    
     const res = await fetch(url, {
       method: 'GET',
+      headers,
       signal: AbortSignal.timeout(5000) // 5초 타임아웃
     });
     return res.ok;
@@ -80,6 +112,7 @@ export const autoDetectServerAddress = async (): Promise<string | null> => {
       const url = `http://${candidate}/api/server-info`;
       const res = await fetch(url, {
         method: 'GET',
+        headers: { 'ngrok-skip-browser-warning': 'true' },
         signal: AbortSignal.timeout(2000) // 2초 타임아웃
       });
       
@@ -108,13 +141,13 @@ export const autoDetectServerAddress = async (): Promise<string | null> => {
 export const loginAPI = async (username: string, password: string) => {
   const res = await fetch(`${getApiBase()}/login`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getHeaders(),
     body: JSON.stringify({ username, password }),
   });
   
   if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.message);
+    const error = await res.json().catch(() => ({ message: '로그인에 실패했습니다.' }));
+    throw new Error(error.message || '로그인에 실패했습니다.');
   }
   
   return res.json();
@@ -123,20 +156,25 @@ export const loginAPI = async (username: string, password: string) => {
 // ============ 사용자 API ============
 
 export const getAllUsersAPI = async () => {
-  const res = await fetch(`${getApiBase()}/users`);
+  const res = await fetch(`${getApiBase()}/users`, {
+    headers: getHeaders(false), // GET 요청은 Content-Type 불필요
+  });
+  if (!res.ok) {
+    throw new Error('사용자 목록을 불러올 수 없습니다.');
+  }
   return res.json();
 };
 
 export const addUserAPI = async (user: any) => {
   const res = await fetch(`${getApiBase()}/users`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getHeaders(),
     body: JSON.stringify(user),
   });
   
   if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.message);
+    const error = await res.json().catch(() => ({ message: '사용자 추가에 실패했습니다.' }));
+    throw new Error(error.message || '사용자 추가에 실패했습니다.');
   }
   
   return res.json();
@@ -145,62 +183,93 @@ export const addUserAPI = async (user: any) => {
 export const deleteUserAPI = async (username: string) => {
   const res = await fetch(`${getApiBase()}/users/${username}`, {
     method: 'DELETE',
+    headers: getHeaders(false), // DELETE 요청은 Content-Type 불필요
   });
+  if (!res.ok) {
+    throw new Error('사용자 삭제에 실패했습니다.');
+  }
   return res.json();
 };
 
 export const updatePasswordAPI = async (username: string, newPassword: string) => {
   const res = await fetch(`${getApiBase()}/users/${username}/password`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getHeaders(),
     body: JSON.stringify({ newPassword }),
   });
+  if (!res.ok) {
+    throw new Error('비밀번호 변경에 실패했습니다.');
+  }
   return res.json();
 };
 
 // ============ 메시지 API ============
 
 export const getUserMessagesAPI = async (userId: string) => {
-  const res = await fetch(`${getApiBase()}/messages/${userId}`);
+  const res = await fetch(`${getApiBase()}/messages/${userId}`, {
+    headers: getHeaders(false), // GET 요청은 Content-Type 불필요
+  });
+  if (!res.ok) {
+    throw new Error('메시지를 불러올 수 없습니다.');
+  }
   return res.json();
 };
 
 export const getPersonaMessagesAPI = async (userId: string, personaId: string) => {
-  const res = await fetch(`${getApiBase()}/messages/${userId}/${personaId}`);
+  const res = await fetch(`${getApiBase()}/messages/${userId}/${personaId}`, {
+    headers: getHeaders(false), // GET 요청은 Content-Type 불필요
+  });
+  if (!res.ok) {
+    throw new Error('메시지를 불러올 수 없습니다.');
+  }
   return res.json();
 };
 
 export const saveMessageAPI = async (userId: string, personaId: string, message: any) => {
   const res = await fetch(`${getApiBase()}/messages/${userId}/${personaId}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getHeaders(),
     body: JSON.stringify({ message }),
   });
+  if (!res.ok) {
+    throw new Error('메시지 저장에 실패했습니다.');
+  }
   return res.json();
 };
 
 export const saveAllMessagesAPI = async (userId: string, personaId: string, messages: any[]) => {
   const res = await fetch(`${getApiBase()}/messages/${userId}/${personaId}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getHeaders(),
     body: JSON.stringify({ messages }),
   });
+  if (!res.ok) {
+    throw new Error('메시지 저장에 실패했습니다.');
+  }
   return res.json();
 };
 
 // ============ 태스크 API ============
 
 export const getUserTasksAPI = async (userId: string) => {
-  const res = await fetch(`${getApiBase()}/tasks/${userId}`);
+  const res = await fetch(`${getApiBase()}/tasks/${userId}`, {
+    headers: getHeaders(false), // GET 요청은 Content-Type 불필요
+  });
+  if (!res.ok) {
+    throw new Error('태스크를 불러올 수 없습니다.');
+  }
   return res.json();
 };
 
 export const saveUserTasksAPI = async (userId: string, tasks: any) => {
   const res = await fetch(`${getApiBase()}/tasks/${userId}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getHeaders(),
     body: JSON.stringify({ tasks }),
   });
+  if (!res.ok) {
+    throw new Error('태스크 저장에 실패했습니다.');
+  }
   return res.json();
 };
 
