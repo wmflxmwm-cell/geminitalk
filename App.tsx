@@ -16,7 +16,8 @@ import {
   getUserMessagesAPI,
   saveMessageAPI,
   getUserTasksAPI,
-  saveUserTasksAPI 
+  saveUserTasksAPI,
+  getServerAddress
 } from './services/apiService';
 import { Message, Persona, Role, User, Task } from './types';
 import { v4 as uuidv4 } from 'uuid';
@@ -154,13 +155,37 @@ const App: React.FC = () => {
     setLoginError(undefined);
 
     try {
-      if (isServerConnected) {
-        // 서버 API로 로그인
-        const result = await loginAPI(username, password);
-        setCurrentUser(result.user);
-        localStorage.setItem('geminiTalkUser', JSON.stringify(result.user));
+      // 서버 주소가 명시적으로 설정되어 있는지 확인
+      const savedServerAddress = localStorage.getItem('geminiTalkServerAddress');
+      const hasCustomServerAddress = savedServerAddress && savedServerAddress !== 'localhost:3001';
+      
+      // 서버 주소가 설정되어 있거나 서버가 연결되어 있으면 항상 서버로 로그인 시도
+      if (hasCustomServerAddress || isServerConnected) {
+        // 서버 API로 로그인 시도
+        try {
+          const result = await loginAPI(username, password);
+          setCurrentUser(result.user);
+          localStorage.setItem('geminiTalkUser', JSON.stringify(result.user));
+          
+          // 서버 연결 성공 시 사용자 목록도 다시 로드
+          try {
+            const users = await getAllUsersAPI();
+            setAllUsers(users);
+            setIsServerConnected(true);
+          } catch (e) {
+            console.warn('사용자 목록 로드 실패:', e);
+          }
+        } catch (serverError: any) {
+          // 서버 로그인 실패 시 에러 표시
+          const errorMsg = serverError.message || "서버에 연결할 수 없습니다.";
+          if (hasCustomServerAddress) {
+            throw new Error(`${errorMsg} 서버 주소(${savedServerAddress})를 확인하세요.`);
+          } else {
+            throw new Error(errorMsg);
+          }
+        }
       } else {
-        // 폴백: 로컬 데이터로 로그인
+        // 서버 주소가 없고 서버 연결도 안 되어 있으면 로컬 데이터로 로그인
         await new Promise(resolve => setTimeout(resolve, 500));
         const user = allUsers[username];
         if (user && user.password === password) {
