@@ -7,23 +7,26 @@
     <title>GeminiTalk - AI Messenger</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            fontFamily: {
-              sans: ['Pretendard', 'sans-serif'],
-            },
-            colors: {
-              primary: {
-                50: '#eff6ff',
-                100: '#dbeafe',
-                500: '#3b82f6',
-                600: '#2563eb',
-                700: '#1d4ed8',
+      // Tailwind가 로드된 후 설정
+      if (typeof tailwind !== 'undefined') {
+        tailwind.config = {
+          theme: {
+            extend: {
+              fontFamily: {
+                sans: ['Pretendard', 'sans-serif'],
               },
-              chat: {
-                user: '#3b82f6',
-                ai: '#f3f4f6',
+              colors: {
+                primary: {
+                  50: '#eff6ff',
+                  100: '#dbeafe',
+                  500: '#3b82f6',
+                  600: '#2563eb',
+                  700: '#1d4ed8',
+                },
+                chat: {
+                  user: '#3b82f6',
+                  ai: '#f3f4f6',
+                }
               }
             }
           }

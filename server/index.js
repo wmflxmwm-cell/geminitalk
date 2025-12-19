@@ -118,9 +118,24 @@ if (existingUsers.count === 0) {
 }
 
 // 미들웨어
-// CORS 설정
+// 모든 요청에 CORS 헤더 추가 (가장 먼저 실행)
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, ngrok-skip-browser-warning, Accept, X-Requested-With, Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
+  res.header('Access-Control-Expose-Headers', 'Content-Length, Content-Type');
+  
+  // OPTIONS 요청은 즉시 응답
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  
+  next();
+});
+
+// CORS 라이브러리도 사용 (이중 보호)
 app.use(cors({
-  origin: '*', // 모든 도메인에서 접근 허용 (개발용)
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
     'Content-Type',
@@ -137,14 +152,6 @@ app.use(cors({
   preflightContinue: false,
   optionsSuccessStatus: 204
 }));
-
-// OPTIONS 요청 명시적 처리
-app.options('*', (req, res) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, ngrok-skip-browser-warning, Accept, X-Requested-With, Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
-  res.sendStatus(204);
-});
 
 app.use(express.json());
 
