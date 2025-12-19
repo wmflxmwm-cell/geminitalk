@@ -24,17 +24,25 @@ const getApiBase = () => {
 
 // ngrok 브라우저 경고 페이지 우회를 위한 헤더
 const getHeaders = (includeContentType: boolean = true) => {
+  const baseUrl = getApiBase();
+  const savedServer = localStorage.getItem('geminiTalkServerAddress');
+  const envServer = import.meta.env.VITE_SERVER_ADDRESS;
+  const serverAddress = savedServer || envServer || '';
+  const isNgrok = baseUrl.includes('ngrok') || serverAddress.includes('ngrok');
+  
   const headers: HeadersInit = {};
   
   if (includeContentType) {
     headers['Content-Type'] = 'application/json';
   }
   
-  // Accept 헤더는 항상 추가 (ngrok 호환성)
+  // Accept 헤더는 항상 추가
   headers['Accept'] = 'application/json';
   
-  // ngrok-skip-browser-warning 헤더는 CORS preflight에서 문제를 일으킬 수 있으므로 제거
-  // 대신 서버에서 ngrok 경고 페이지를 처리하도록 함
+  // ngrok 브라우저 경고 페이지 우회 (서버에서 CORS 허용 필요)
+  if (isNgrok) {
+    headers['ngrok-skip-browser-warning'] = 'true';
+  }
   
   return headers;
 };
@@ -46,14 +54,18 @@ const parseJSONResponse = async (res: Response) => {
   // HTML이 반환되면 ngrok 경고 페이지일 가능성
   if (contentType && contentType.includes('text/html')) {
     const text = await res.text();
-    if (text.includes('<!DOCTYPE') || text.includes('<html')) {
-      throw new Error('서버에 연결할 수 없습니다. ngrok 경고 페이지가 표시되었습니다.');
+    if (text.includes('<!DOCTYPE') || text.includes('<html') || text.includes('ngrok')) {
+      throw new Error('ngrok 경고 페이지가 표시되었습니다. 서버 PC에서 ngrok을 재시작하거나 ngrok 설정을 확인하세요.');
     }
   }
   
   // JSON 파싱 시도
   try {
-    return await res.json();
+    const text = await res.text();
+    if (!text) {
+      return {};
+    }
+    return JSON.parse(text);
   } catch (error) {
     // JSON이 아니면 에러
     throw new Error('서버 응답이 올바르지 않습니다.');
