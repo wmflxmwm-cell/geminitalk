@@ -211,7 +211,6 @@ const App: React.FC = () => {
     setCurrentUser(null);
     setActivePersonaId(null);
     setMessages({});
-    chatInstances.current = {};
     localStorage.removeItem('geminiTalkUser');
   };
 

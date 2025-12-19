@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Lock, User as UserIcon, Loader2, Wifi, WifiOff } from 'lucide-react';
+import { Lock, User as UserIcon, Loader2, Wifi, WifiOff, X } from 'lucide-react';
 
 interface LoginProps {
   onLogin: (username: string, password: string) => Promise<void>;
