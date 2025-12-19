@@ -39,10 +39,10 @@ const getHeaders = (includeContentType: boolean = true) => {
   // Accept 헤더는 항상 추가
   headers['Accept'] = 'application/json';
   
-  // ngrok 브라우저 경고 페이지 우회 (서버에서 CORS 허용 필요)
-  if (isNgrok) {
-    headers['ngrok-skip-browser-warning'] = 'true';
-  }
+  // ngrok-skip-browser-warning 헤더는 CORS preflight에서 문제를 일으킬 수 있으므로 제거
+  // 대신 서버에서 ngrok 경고 페이지를 처리하도록 함
+  // ngrok 무료 플랜에서는 브라우저 경고 페이지가 표시될 수 있지만,
+  // 서버의 parseJSONResponse 함수가 이를 감지하고 처리합니다.
   
   return headers;
 };
