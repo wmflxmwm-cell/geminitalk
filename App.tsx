@@ -95,7 +95,8 @@ const App: React.FC = () => {
         
         // 서버에서 사용자 목록 가져오기
         const users = await getAllUsersAPI();
-        if (users && Object.keys(users).length > 0) {
+        // 서버에서 받은 데이터로 항상 업데이트 (빈 객체여도)
+        if (users) {
           setAllUsers(users);
         }
         setIsServerConnected(true);
@@ -162,7 +163,8 @@ const App: React.FC = () => {
     try {
       // 서버 주소가 명시적으로 설정되어 있는지 확인
       const savedServerAddress = localStorage.getItem('geminiTalkServerAddress');
-      const hasCustomServerAddress = savedServerAddress && savedServerAddress !== 'localhost:3001';
+      const envServerAddress = import.meta.env.VITE_SERVER_ADDRESS;
+      const hasCustomServerAddress = (savedServerAddress && savedServerAddress !== 'localhost:3001') || !!envServerAddress;
       
       // 서버 주소가 설정되어 있거나 서버가 연결되어 있으면 항상 서버로 로그인 시도
       if (hasCustomServerAddress || isServerConnected) {
@@ -172,19 +174,24 @@ const App: React.FC = () => {
           setCurrentUser(result.user);
           localStorage.setItem('geminiTalkUser', JSON.stringify(result.user));
           
-          // 서버 연결 성공 시 사용자 목록도 다시 로드
+          // 로그인 성공 후 항상 사용자 목록 다시 로드 (서버의 최신 상태 유지)
           try {
             const users = await getAllUsersAPI();
-            setAllUsers(users);
+            if (users) {
+              setAllUsers(users);
+            }
             setIsServerConnected(true);
+            console.log('✅ 로그인 후 사용자 목록 로드 완료');
           } catch (e) {
             console.warn('사용자 목록 로드 실패:', e);
+            // 사용자 목록 로드 실패해도 로그인은 성공한 상태 유지
           }
         } catch (serverError: any) {
           // 서버 로그인 실패 시 에러 표시
           const errorMsg = serverError.message || "서버에 연결할 수 없습니다.";
           if (hasCustomServerAddress) {
-            throw new Error(`${errorMsg} 서버 주소(${savedServerAddress})를 확인하세요.`);
+            const address = savedServerAddress || envServerAddress;
+            throw new Error(`${errorMsg} 서버 주소(${address})를 확인하세요.`);
           } else {
             throw new Error(errorMsg);
           }
@@ -241,7 +248,7 @@ const App: React.FC = () => {
         await addUserAPI(newUser);
         // 서버에서 최신 사용자 목록 다시 불러오기 (서버의 최신 상태 유지)
         const users = await getAllUsersAPI();
-        if (users && Object.keys(users).length > 0) {
+        if (users) {
           setAllUsers(users);
           // useEffect가 allUsers 변경을 감지하여 친구 목록 자동 업데이트
         }
@@ -271,7 +278,7 @@ const App: React.FC = () => {
         await deleteUserAPI(username);
         // 서버에서 최신 사용자 목록 다시 불러오기 (서버의 최신 상태 유지)
         const users = await getAllUsersAPI();
-        if (users && Object.keys(users).length > 0) {
+        if (users) {
           setAllUsers(users);
           // useEffect가 allUsers 변경을 감지하여 친구 목록 자동 업데이트
         }
